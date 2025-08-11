@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"math"
-	"strconv"
-	"strings"
+	"opencalcc/mathcat"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -16,6 +14,10 @@ func main() {
 	app := app.New()
 	window := app.NewWindow("OpenCalcc")
 
+	// graph
+	graphContent := widget.NewLabel("Graph goes here")
+
+	// Calc
 	input := widget.NewEntry()
 	input.SetPlaceHolder("Enter text...")
 
@@ -23,23 +25,37 @@ func main() {
 	output.SetPlaceHolder("Result will appear here")
 	output.Disable()
 
-	window.SetContent(container.NewVBox(
-		widget.NewLabel("OpenCalcc - A simple calculator"),
+	history := container.NewVBox(
+		widget.NewLabel("History"),
+	)
+
+	calcmode := false
+	calcmodeSwitch := widget.NewCheck("Exact Mode", func(checked bool) {
+		calcmode = checked
+	})
+
+	calcContent := container.NewVBox(
+		widget.NewLabel("OpenCalcc"),
 		input,
 		output,
-		widget.NewButton("Press Enter", PressedEnter),
-	))
+		widget.NewButton("Press Enter", func() {
+			PressedEnter(input, output, history, calcmode)
+		}),
+		calcmodeSwitch,
+		history,
+	)
+
+	// tabs
+	tabs := container.NewAppTabs(
+		container.NewTabItem("Calc", calcContent),
+		container.NewTabItem("Graph", graphContent),
+	)
+	tabs.SetTabLocation(container.TabLocationTop)
+
+	window.SetContent(tabs)
 
 	input.OnSubmitted = func(text string) {
-		if text == "" {
-			return
-		}
-		result, err := evalMath(text)
-		if err != nil {
-			output.SetText("Error: " + err.Error())
-		} else {
-			output.SetText(fmt.Sprintf("%v", round(result, 4))) // TODO: ability to change decimal place settings while removing floating point errors
-		}
+		PressedEnter(input, output, history, calcmode)
 	}
 
 	window.Resize(fyne.NewSize(1000, 750))
@@ -51,45 +67,24 @@ func onLeave() {
 	fmt.Println("Exited")
 }
 
-func PressedEnter() {
-	fmt.Println("Enter key pressed")
-}
-
-func evalMath(expr string) (float64, error) {
-	expr = strings.ReplaceAll(expr, " ", "")
-	var opperator rune
-	for _, char := range "+-*/" {
-		if strings.ContainsRune(expr, char) {
-			opperator = char
-			parts := strings.Split(expr, string(opperator))
-			if len(parts) != 2 {
-				return 0, fmt.Errorf("invalid expression: %s", expr)
-			}
-			part1, error1 := strconv.ParseFloat(parts[0], 64)
-			part2, error2 := strconv.ParseFloat(parts[1], 64)
-			if error1 != nil || error2 != nil {
-				return 0, fmt.Errorf("invalid number in expression: %s", expr)
-			}
-
-			switch opperator {
-			case '+':
-				return part1 + part2, nil
-			case '-':
-				return part1 - part2, nil
-			case '*':
-				return part1 * part2, nil
-			case '/':
-				if part2 == 0 {
-					return 0, fmt.Errorf("division by zero")
-				}
-				return part1 / part2, nil
-			}
-		}
+func PressedEnter(expression fyne.CanvasObject, output fyne.CanvasObject, history fyne.CanvasObject, calcmode bool) {
+	if expression.(*widget.Entry).Text == "" {
+		output.(*widget.Entry).SetText("")
+		return
 	}
-	return 0, fmt.Errorf("no valid operator found in expression: %s", expr)
-}
+	result, err := mathcat.Eval(expression.(*widget.Entry).Text)
+	if err != nil {
+		output.(*widget.Entry).SetText("Error: " + err.Error())
+	} else {
+		var outputText string
+		if !calcmode { // float else exact
+			floatResult, _ := result.Float64()
+			outputText = fmt.Sprintf("%.6g", floatResult)
+		} else {
+			outputText = fmt.Sprintf("%s", result)
+		}
+		output.(*widget.Entry).SetText(outputText)
+	}
 
-func round(num float64, precision int) float64 {
-	pow := math.Pow(10, float64(precision))
-	return math.Round(num*pow) / pow
+	history.(*fyne.Container).Add(widget.NewLabel(fmt.Sprintf("%s = %s", expression.(*widget.Entry).Text, output.(*widget.Entry).Text)))
 }
