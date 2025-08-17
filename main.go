@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image/color"
 	"log"
 	"math"
 	"math/big"
@@ -13,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -24,62 +26,132 @@ func main() {
 	window := app.NewWindow("OpenCalcc")
 
 	// graph
-	function := widget.NewEntry()
-	function.SetPlaceHolder("Enter function...")
+	functionLabel := widget.NewRichTextFromMarkdown("## Function Input")
+	function1 := widget.NewEntry()
+	function1.SetPlaceHolder("Enter function...")
+	function1.Resize(fyne.NewSize(400, 40))
+
+	function2 := widget.NewEntry()
+	function2.SetPlaceHolder("Enter function...")
+	function2.Resize(fyne.NewSize(400, 40))
+
+	function3 := widget.NewEntry()
+	function3.SetPlaceHolder("Enter function...")
+	function3.Resize(fyne.NewSize(400, 40))
+
+	function4 := widget.NewEntry()
+	function4.SetPlaceHolder("Enter function...")
+	function4.Resize(fyne.NewSize(400, 40))
 
 	domainMin := widget.NewEntry()
-	domainMin.SetPlaceHolder("Domain Min")
+	domainMin.SetPlaceHolder("Min")
+	domainMin.Resize(fyne.NewSize(80, 50))
 	domainMax := widget.NewEntry()
-	domainMax.SetPlaceHolder("Domain Max")
+	domainMax.SetPlaceHolder("Max")
+	domainMax.Resize(fyne.NewSize(80, 50))
+
+	domainContainer := container.NewHBox(
+		widget.NewLabel("Domain:"),
+		domainMin,
+		widget.NewLabel("to"),
+		domainMax,
+	)
 
 	rangeMin := widget.NewEntry()
-	rangeMin.SetPlaceHolder("Range Min")
+	rangeMin.SetPlaceHolder("Min")
+	rangeMin.Resize(fyne.NewSize(80, 50))
 	rangeMax := widget.NewEntry()
-	rangeMax.SetPlaceHolder("Range Max")
+	rangeMax.SetPlaceHolder("Max")
+	rangeMax.Resize(fyne.NewSize(80, 50))
+
+	rangeContainer := container.NewHBox(
+		widget.NewLabel("Range:"),
+		rangeMin,
+		widget.NewLabel("to"),
+		rangeMax,
+	)
 
 	file := "opencalccgraph.png"
-	makeGraph(file, function.Text, domainMin.Text, domainMax.Text, rangeMin.Text, rangeMax.Text)
+	makeGraph(file, function1.Text, function2.Text, function3.Text, function4.Text, domainMin.Text, domainMax.Text, rangeMin.Text, rangeMax.Text)
 	graph := canvas.NewImageFromFile(file)
 	graph.FillMode = canvas.ImageFillOriginal
-	graph.Resize(fyne.NewSize(800, 600))
+	graph.Resize(fyne.NewSize(600, 450))
 
 	regenGraph := widget.NewButton("Regenerate Graph", func() {
-		makeGraph(file, function.Text, domainMin.Text, domainMax.Text, rangeMin.Text, rangeMax.Text)
+		makeGraph(file, function1.Text, function2.Text, function3.Text, function4.Text, domainMin.Text, domainMax.Text, rangeMin.Text, rangeMax.Text)
 		graph.File = file
 		graph.Refresh()
 	})
 
 	// trace funcs
+	traceLabel := widget.NewRichTextFromMarkdown("## Trace Graph")
+
+	traceSelector := widget.NewLabel("Select a function to trace:")
+	selectedfunc := "Func 1"
+	traceFunctionSelector := widget.NewSelect([]string{"Func 1", "Func 2", "Func 3", "Func 4"}, func(selected string) {
+		selectedfunc = selected
+	})
+
 	traceXnum := widget.NewEntry()
-	traceXnum.SetPlaceHolder("Trace X")
-	traceXresult := widget.NewLabel("")
+	traceXnum.SetPlaceHolder("X value")
+	traceXnum.Resize(fyne.NewSize(100, 35))
+
+	traceXresult := widget.NewLabel("Result will appear here")
+	traceXresult.Wrapping = fyne.TextWrapWord
+
 	traceX := widget.NewButton("Trace X", func() {
 		x, err := strconv.ParseFloat(traceXnum.Text, 64)
 		if err != nil {
+			traceXresult.SetText("Invalid X value")
 			return
 		}
-
-		fn, err := parseFunction(function.Text)
+		var fn *plotter.Function
+		switch selectedfunc {
+		case "Func 1":
+			fn, err = parseFunction(function1.Text)
+		case "Func 2":
+			fn, err = parseFunction(function2.Text)
+		case "Func 3":
+			fn, err = parseFunction(function3.Text)
+		case "Func 4":
+			fn, err = parseFunction(function4.Text)
+		}
 		if err != nil {
+			traceXresult.SetText("Invalid function")
 			return
 		}
 
 		y := fn.F(x)
-		output := fmt.Sprintf("f(%s) = %f", traceXnum.Text, y)
+		output := fmt.Sprintf("f(%s) = %.6g", traceXnum.Text, y)
 		traceXresult.SetText(output)
 	})
 
 	traceYnum := widget.NewEntry()
-	traceYnum.SetPlaceHolder("Trace Y")
-	traceYresult := widget.NewLabel("")
+	traceYnum.SetPlaceHolder("Y value")
+	traceYnum.Resize(fyne.NewSize(100, 35))
+
+	traceYresult := widget.NewLabel("Result will appear here")
+	traceYresult.Wrapping = fyne.TextWrapWord
+
 	traceY := widget.NewButton("Trace Y", func() {
 		y, err := strconv.ParseFloat(traceYnum.Text, 64)
 		if err != nil {
+			traceYresult.SetText("Invalid Y value")
 			return
 		}
-
-		fn, err := parseFunction(function.Text)
+		var fn *plotter.Function
+		switch selectedfunc {
+		case "Func 1":
+			fn, err = parseFunction(function1.Text)
+		case "Func 2":
+			fn, err = parseFunction(function2.Text)
+		case "Func 3":
+			fn, err = parseFunction(function3.Text)
+		case "Func 4":
+			fn, err = parseFunction(function4.Text)
+		}
 		if err != nil {
+			traceYresult.SetText("Invalid function")
 			return
 		}
 
@@ -97,58 +169,111 @@ func main() {
 			traceYresult.SetText("No solution found")
 			return
 		}
-		output := fmt.Sprintf("f⁻¹(%s) = %f", traceYnum.Text, x)
+		output := fmt.Sprintf("f⁻¹(%s) = %.6g", traceYnum.Text, x)
 		traceYresult.SetText(output)
 	})
 
-	graphContent := container.NewVBox(
-		graph,
-		function,
-		regenGraph,
-		domainMin,
-		domainMax,
-		rangeMin,
-		rangeMax,
-		widget.NewLabel("Trace Functions"),
+	traceXcontainer := container.NewHBox(
 		traceXnum,
 		traceX,
-		traceXresult,
+	)
+	traceYcontainer := container.NewHBox(
 		traceYnum,
 		traceY,
+	)
+
+	// graph control panel
+	controlPanel := container.NewVBox(
+		functionLabel,
+		function1,
+		function2,
+		function3,
+		function4,
+		container.NewHBox(layout.NewSpacer(), regenGraph, layout.NewSpacer()),
+		widget.NewSeparator(),
+		domainContainer,
+		rangeContainer,
+		widget.NewSeparator(),
+		traceLabel,
+		traceSelector,
+		traceFunctionSelector,
+		widget.NewLabel("Trace X"),
+		traceXcontainer,
+		traceXresult,
+		widget.NewLabel("Trace Y"),
+		traceYcontainer,
 		traceYresult,
 	)
 
+	graphContent := container.NewHSplit(
+		graph,
+		container.NewScroll(controlPanel),
+	)
+	graphContent.Offset = 0.7
+
 	// Calc
+	calcTitle := widget.NewRichTextFromMarkdown("## Calculator")
+
 	input := widget.NewEntry()
 	input.SetPlaceHolder("Enter text...")
+	input.Resize(fyne.NewSize(400, 40))
 
 	output := widget.NewMultiLineEntry()
 	output.SetPlaceHolder("Result will appear here")
 	output.Disable()
+	output.Resize(fyne.NewSize(400, 40))
 
-	history := container.NewVBox(
-		widget.NewLabel("History"),
-	)
+	historyTitle := widget.NewRichTextFromMarkdown("#d# History")
+	historyScroll := container.NewScroll(container.NewVBox())
+	historyScroll.SetMinSize(fyne.NewSize(400, 200))
 
 	calcmode := false
-	calcmodeSwitch := widget.NewCheck("Exact Mode", func(checked bool) {
+	var calcmodeSwitch *widget.Check
+	calcmodeSwitch = widget.NewCheck("Exact Mode", func(checked bool) {
 		calcmode = checked
+		if checked {
+			calcmodeSwitch.SetText("Float Mode")
+		} else {
+			calcmodeSwitch.SetText("Exact Mode")
+		}
 	})
 
+	calcButton := widget.NewButton("Calculate", func() {
+		PressedEnter(input, output, historyScroll.Content, calcmode)
+	})
+	calcButton.Importance = widget.HighImportance
+
+	clearButton := widget.NewButton("Clear Input", func() {
+		input.SetText("")
+		output.SetText("")
+	})
+
+	clearHistory := widget.NewButton("Clear History", func() {
+		historyScroll.Content.(*fyne.Container).Objects = []fyne.CanvasObject{}
+		historyScroll.Refresh()
+	})
+
+	buttonContainer := container.NewHBox(
+		calcButton,
+		clearButton,
+		clearHistory,
+	)
+
 	calcContent := container.NewVBox(
-		widget.NewLabel("OpenCalcc"),
+		calcTitle,
+		widget.NewSeparator(),
 		input,
 		output,
-		widget.NewButton("Press Enter", func() {
-			PressedEnter(input, output, history, calcmode)
-		}),
+		container.NewHBox(layout.NewSpacer(), buttonContainer, layout.NewSpacer()),
 		calcmodeSwitch,
-		history,
+		widget.NewSeparator(),
+		historyTitle,
+		historyScroll,
 	)
 
 	// tabs
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Calc", calcContent),
+		container.NewTabItem("Calculator", calcContent),
 		container.NewTabItem("Graph", graphContent),
 	)
 	tabs.SetTabLocation(container.TabLocationTop)
@@ -156,10 +281,10 @@ func main() {
 	window.SetContent(tabs)
 
 	input.OnSubmitted = func(text string) {
-		PressedEnter(input, output, history, calcmode)
+		PressedEnter(input, output, historyScroll.Content, calcmode)
 	}
 
-	window.Resize(fyne.NewSize(1000, 750))
+	window.Resize(fyne.NewSize(1200, 800))
 	window.ShowAndRun()
 	onLeave()
 }
@@ -190,7 +315,7 @@ func PressedEnter(expression fyne.CanvasObject, output fyne.CanvasObject, histor
 	history.(*fyne.Container).Add(widget.NewLabel(fmt.Sprintf("%s = %s", expression.(*widget.Entry).Text, output.(*widget.Entry).Text)))
 }
 
-func makeGraph(filename string, function string, domainMin string, domainMax string, rangeMin string, rangeMax string) {
+func makeGraph(filename string, function1 string, function2 string, function3 string, function4 string, domainMin string, domainMax string, rangeMin string, rangeMax string) {
 	p := plot.New()
 
 	p.Title.Text = "Functions"
@@ -200,14 +325,26 @@ func makeGraph(filename string, function string, domainMin string, domainMax str
 	// plottedfunc := plotter.NewFunction(func(x float64) float64 { return mathcat.Parse(function) })
 	// plottedfunc.Color = color.RGBA{B: 255, A: 255}
 
-	fn, _ := parseFunction(function)
+	fn1, _ := parseFunction(function1)
+	fn2, _ := parseFunction(function2)
+	fn3, _ := parseFunction(function3)
+	fn4, _ := parseFunction(function4)
+
+	fn1.Color = color.RGBA{R: 255, A: 255}
+	fn2.Color = color.RGBA{G: 255, A: 255}
+	fn3.Color = color.RGBA{B: 255, A: 255}
 
 	// legend
-	p.Add(fn)
-	p.Legend.Add(function, fn)
+	p.Add(fn1)
+	p.Add(fn2)
+	p.Add(fn3)
+	p.Add(fn4)
+	p.Legend.Add(function1, fn1)
+	p.Legend.Add(function2, fn2)
+	p.Legend.Add(function3, fn3)
+	p.Legend.Add(function4, fn4)
 	p.Legend.ThumbnailWidth = 0.5 * vg.Inch
 
-	// Convert domainMin, domainMax, rangeMin, rangeMax to float64
 	importedDomainMin, err := strconv.ParseFloat(domainMin, 64)
 	if err != nil {
 		importedDomainMin = 0
@@ -236,22 +373,52 @@ func makeGraph(filename string, function string, domainMin string, domainMax str
 }
 
 func parseFunction(exprStr string) (*plotter.Function, error) {
+	if exprStr == "" {
+		fn := plotter.NewFunction(func(x float64) float64 {
+			return math.NaN()
+		})
+		fn.Samples = 1000
+		return fn, nil
+	}
 	fn := plotter.NewFunction(func(x float64) float64 {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("panic in function evaluation: %v", r)
+			}
+		}()
 		variables := map[string]*big.Rat{
-			"x": new(big.Rat).SetFloat64(x), // Use SetFloat64 instead of converting to int64
+			"x": new(big.Rat).SetFloat64(x),
 			"pi": func() *big.Rat {
 				rat, _ := new(big.Float).SetFloat64(math.Pi).Rat(nil)
 				return rat
 			}(),
+			"e": func() *big.Rat {
+				rat, _ := new(big.Float).SetFloat64(math.E).Rat(nil)
+				return rat
+			}(),
 		}
+
+		var floatVal float64
+		var ok bool
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("panic in function evaluation (outer): %v", r)
+				floatVal = math.NaN()
+				ok = false
+			}
+		}()
 
 		res, err := mathcat.Exec(exprStr, variables)
-		if err != nil {
-			log.Printf("eval error: %v", err)
+		if err != nil || res == nil {
 			return math.NaN()
 		}
-
-		floatVal, _ := res.Float64()
+		floatVal, ok = res.Float64()
+		if !ok {
+			return math.NaN()
+		}
+		if math.IsInf(floatVal, 0) || math.IsNaN(floatVal) {
+			return math.NaN()
+		}
 		return floatVal
 	})
 	fn.Samples = 1000
