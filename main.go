@@ -81,6 +81,18 @@ func main() {
 		graph.File = file
 		graph.Refresh()
 	})
+	function1.OnSubmitted = func(text string) {
+		makeGraph(file, function1.Text, function2.Text, function3.Text, function4.Text, domainMin.Text, domainMax.Text, rangeMin.Text, rangeMax.Text)
+		graph.File = file
+		graph.Refresh()
+	}
+	function2.OnSubmitted = function1.OnSubmitted
+	function3.OnSubmitted = function1.OnSubmitted
+	function4.OnSubmitted = function1.OnSubmitted
+	domainMin.OnSubmitted = function1.OnSubmitted
+	domainMax.OnSubmitted = function1.OnSubmitted
+	rangeMin.OnSubmitted = function1.OnSubmitted
+	rangeMax.OnSubmitted = function1.OnSubmitted
 
 	// trace funcs
 	traceLabel := widget.NewRichTextFromMarkdown("## Trace Graph")
@@ -181,6 +193,60 @@ func main() {
 		traceY,
 	)
 
+	intersectionSelection := []string{}
+	intersectionSelect1 := widget.NewSelect([]string{"Func 1", "Func 2", "Func 3", "Func 4"}, func(selected string) {
+		intersectionSelection = append(intersectionSelection, selected)
+	})
+	intersectionSelect2 := widget.NewSelect([]string{"Func 1", "Func 2", "Func 3", "Func 4"}, func(selected string) {
+		intersectionSelection = append(intersectionSelection, selected)
+	})
+
+	findIntersectionResult := widget.NewLabel("Intersection result will appear here")
+
+	findIntersection := widget.NewButton("Find Intersection between 2 functions", func() {
+		var fn1, fn2 *plotter.Function
+		var err error
+
+		if len(intersectionSelection) < 2 {
+			traceYresult.SetText("Please select 2 functions")
+			return
+		}
+
+		for _, selected := range intersectionSelection {
+			switch selected {
+			case "Func 1":
+				fn1, err = parseFunction(function1.Text)
+			case "Func 2":
+				fn1, err = parseFunction(function2.Text)
+			case "Func 3":
+				fn1, err = parseFunction(function3.Text)
+			case "Func 4":
+				fn1, err = parseFunction(function4.Text)
+			}
+			if err != nil {
+				traceYresult.SetText("Invalid function")
+				return
+			}
+		}
+
+		dMin, err1 := strconv.ParseFloat(domainMin.Text, 64)
+		if err1 != nil {
+			dMin = 0
+		}
+		dMax, err2 := strconv.ParseFloat(domainMax.Text, 64)
+		if err2 != nil {
+			dMax = 10
+		}
+
+		x, y, found := findIntersection(fn1, fn2, dMin, dMax, 1e-6)
+		if !found {
+			findIntersectionResult.SetText("No intersection found")
+			return
+		}
+		output := fmt.Sprintf("Intersection at (%.6g, %.6g)", x, y)
+		findIntersectionResult.SetText(output)
+	})
+
 	// graph control panel
 	controlPanel := container.NewVBox(
 		functionLabel,
@@ -202,6 +268,11 @@ func main() {
 		widget.NewLabel("Trace Y"),
 		traceYcontainer,
 		traceYresult,
+		widget.NewSeparator(),
+		intersectionSelect1,
+		intersectionSelect2,
+		findIntersection,
+		findIntersectionResult,
 	)
 
 	graphContent := container.NewHSplit(
@@ -222,7 +293,7 @@ func main() {
 	output.Disable()
 	output.Resize(fyne.NewSize(400, 40))
 
-	historyTitle := widget.NewRichTextFromMarkdown("#d# History")
+	historyTitle := widget.NewRichTextFromMarkdown("## History")
 	historyScroll := container.NewScroll(container.NewVBox())
 	historyScroll.SetMinSize(fyne.NewSize(400, 200))
 
@@ -306,7 +377,7 @@ func PressedEnter(expression fyne.CanvasObject, output fyne.CanvasObject, histor
 			floatResult, _ := result.Float64()
 			outputText = fmt.Sprintf("%.6g", floatResult)
 		} else {
-			outputText = fmt.Sprintf("%s", result)
+			outputText = result.String()
 		}
 		output.(*widget.Entry).SetText(outputText)
 	}
@@ -426,4 +497,24 @@ func findInverse(fn *plotter.Function, y float64, Dmin, Dmax, tol float64) (floa
 		}
 	}
 	return math.NaN(), false
+}
+
+func findIntersection(fn1, fn2 *plotter.Function, Dmin, Dmax, tol float64) (float64, float64, bool) {
+	for i := 0; i < 100; i++ {
+		mid := (Dmin + Dmax) / 2
+		f1 := fn1.F(mid)
+		f2 := fn2.F(mid)
+		if math.IsNaN(f1) || math.IsNaN(f2) {
+			return math.NaN(), math.NaN(), false
+		}
+		if math.Abs(f1-f2) < tol {
+			return mid, f1, true
+		}
+		if f1 < f2 {
+			Dmin = mid
+		} else {
+			Dmax = mid
+		}
+	}
+	return math.NaN(), math.NaN(), false
 }
