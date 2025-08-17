@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"image/color"
-	"log"
 	"math"
 	"math/big"
 	"strconv"
@@ -381,11 +380,6 @@ func parseFunction(exprStr string) (*plotter.Function, error) {
 		return fn, nil
 	}
 	fn := plotter.NewFunction(func(x float64) float64 {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("panic in function evaluation: %v", r)
-			}
-		}()
 		variables := map[string]*big.Rat{
 			"x": new(big.Rat).SetFloat64(x),
 			"pi": func() *big.Rat {
@@ -398,21 +392,11 @@ func parseFunction(exprStr string) (*plotter.Function, error) {
 			}(),
 		}
 
-		var floatVal float64
-		var ok bool
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("panic in function evaluation (outer): %v", r)
-				floatVal = math.NaN()
-				ok = false
-			}
-		}()
-
 		res, err := mathcat.Exec(exprStr, variables)
 		if err != nil || res == nil {
 			return math.NaN()
 		}
-		floatVal, ok = res.Float64()
+		floatVal, ok := res.Float64()
 		if !ok {
 			return math.NaN()
 		}
