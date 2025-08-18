@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"image/color"
 	"math"
-	"math/big"
+	"os"
 	"strconv"
+	"strings"
 
 	"opencalcc/mathcat"
 
@@ -18,6 +19,8 @@ import (
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
+	"gonum.org/v1/plot/vg/vgimg"
 )
 
 func main() {
@@ -208,30 +211,45 @@ func main() {
 		var err error
 
 		if len(intersectionSelection) < 2 {
-			traceYresult.SetText("Please select 2 functions")
+			findIntersectionResult.SetText("Please select 2 functions")
 			return
 		}
 
-		for _, selected := range intersectionSelection {
-			switch selected {
-			case "Func 1":
-				fn1, err = parseFunction(function1.Text)
-			case "Func 2":
-				fn1, err = parseFunction(function2.Text)
-			case "Func 3":
-				fn1, err = parseFunction(function3.Text)
-			case "Func 4":
-				fn1, err = parseFunction(function4.Text)
-			}
-			if err != nil {
-				traceYresult.SetText("Invalid function")
-				return
-			}
+		// Get first function
+		switch intersectionSelection[0] {
+		case "Func 1":
+			fn1, err = parseFunction(function1.Text)
+		case "Func 2":
+			fn1, err = parseFunction(function2.Text)
+		case "Func 3":
+			fn1, err = parseFunction(function3.Text)
+		case "Func 4":
+			fn1, err = parseFunction(function4.Text)
+		}
+		if err != nil || fn1 == nil {
+			findIntersectionResult.SetText("Invalid first function")
+			return
+		}
+
+		// Get second function
+		switch intersectionSelection[1] {
+		case "Func 1":
+			fn2, err = parseFunction(function1.Text)
+		case "Func 2":
+			fn2, err = parseFunction(function2.Text)
+		case "Func 3":
+			fn2, err = parseFunction(function3.Text)
+		case "Func 4":
+			fn2, err = parseFunction(function4.Text)
+		}
+		if err != nil || fn2 == nil {
+			findIntersectionResult.SetText("Invalid second function")
+			return
 		}
 
 		dMin, err1 := strconv.ParseFloat(domainMin.Text, 64)
 		if err1 != nil {
-			dMin = 0
+			dMin = -10
 		}
 		dMax, err2 := strconv.ParseFloat(domainMax.Text, 64)
 		if err2 != nil {
@@ -389,35 +407,21 @@ func makeGraph(filename string, function1 string, function2 string, function3 st
 	p := plot.New()
 
 	p.Title.Text = "Functions"
+	p.Title.TextStyle.Font.Size = vg.Points(24)
 	p.X.Label.Text = "X"
 	p.Y.Label.Text = "Y"
+	p.X.Label.TextStyle.Font.Size = vg.Points(20)
+	p.Y.Label.TextStyle.Font.Size = vg.Points(20)
+	p.X.Tick.Label.Font.Size = vg.Points(16)
+	p.Y.Tick.Label.Font.Size = vg.Points(16)
+	p.Legend.TextStyle.Font.Size = vg.Points(16)
 
-	// plottedfunc := plotter.NewFunction(func(x float64) float64 { return mathcat.Parse(function) })
-	// plottedfunc.Color = color.RGBA{B: 255, A: 255}
-
-	fn1, _ := parseFunction(function1)
-	fn2, _ := parseFunction(function2)
-	fn3, _ := parseFunction(function3)
-	fn4, _ := parseFunction(function4)
-
-	fn1.Color = color.RGBA{R: 255, A: 255}
-	fn2.Color = color.RGBA{G: 255, A: 255}
-	fn3.Color = color.RGBA{B: 255, A: 255}
-
-	// legend
-	p.Add(fn1)
-	p.Add(fn2)
-	p.Add(fn3)
-	p.Add(fn4)
-	p.Legend.Add(function1, fn1)
-	p.Legend.Add(function2, fn2)
-	p.Legend.Add(function3, fn3)
-	p.Legend.Add(function4, fn4)
-	p.Legend.ThumbnailWidth = 0.5 * vg.Inch
+	p.X.Width = vg.Points(2)
+	p.Y.Width = vg.Points(2)
 
 	importedDomainMin, err := strconv.ParseFloat(domainMin, 64)
 	if err != nil {
-		importedDomainMin = 0
+		importedDomainMin = -10
 	}
 	importedDomainMax, err := strconv.ParseFloat(domainMax, 64)
 	if err != nil {
@@ -425,58 +429,158 @@ func makeGraph(filename string, function1 string, function2 string, function3 st
 	}
 	importedRangeMin, err := strconv.ParseFloat(rangeMin, 64)
 	if err != nil {
-		importedRangeMin = 0
+		importedRangeMin = -10
 	}
 	importedRangeMax, err := strconv.ParseFloat(rangeMax, 64)
 	if err != nil {
 		importedRangeMax = 10
 	}
 
+	majorInterval := 1.0
+	if math.Abs(importedDomainMax-importedDomainMin) >= 15 {
+		majorInterval = 5.0
+	}
+
+	p.X.Tick.Marker = SubTicker{Major: majorInterval, Minor: majorInterval / 4}
+	p.Y.Tick.Marker = SubTicker{Major: majorInterval, Minor: majorInterval / 4}
+
+	// grids
+	mainGrid := plotter.NewGrid()
+	mainGrid.Vertical.Width = vg.Points(2)
+	mainGrid.Horizontal.Width = vg.Points(2)
+	mainGrid.Vertical.Color = color.RGBA{A: 180}
+	mainGrid.Horizontal.Color = color.RGBA{A: 180}
+
+	// small grid
+	fineGrid := plotter.NewGrid()
+	fineGrid.Vertical.Width = vg.Points(0.5)
+	fineGrid.Horizontal.Width = vg.Points(0.5)
+	fineGrid.Vertical.Color = color.RGBA{A: 40}
+	fineGrid.Horizontal.Color = color.RGBA{A: 40}
+
+	p.Add(fineGrid)
+	p.Add(mainGrid)
+
+	if importedDomainMin <= 0 && importedDomainMax >= 0 {
+		yAxis := plotter.NewFunction(func(x float64) float64 { return x * 0 })
+		yAxis.Width = vg.Points(3)
+		yAxis.Color = color.RGBA{A: 255}
+		p.Add(yAxis)
+	}
+	if importedRangeMin <= 0 && importedRangeMax >= 0 {
+		xAxis := plotter.NewFunction(func(x float64) float64 { return 0 })
+		xAxis.Width = vg.Points(3)
+		xAxis.Color = color.RGBA{A: 255}
+		p.Add(xAxis)
+	}
+
+	// probelems:
+	// no clear y axis
+	// when changing domain there are too many sublines
+
+	funcs := []string{function1, function2, function3, function4}
+	colors := []color.Color{
+		color.RGBA{R: 255, A: 255},
+		color.RGBA{G: 255, A: 255},
+		color.RGBA{B: 255, A: 255},
+		color.RGBA{B: 255, G: 255, A: 255},
+	}
+
+	for i, f := range funcs {
+		if f == "" {
+			continue
+		}
+		pts := generatePoints(f, importedDomainMin, importedDomainMax)
+		line, err := plotter.NewLine(pts)
+		if err != nil {
+			continue
+		}
+		line.Color = colors[i]
+		p.Add(line)
+		p.Legend.Add(f, line)
+	}
+
 	p.X.Min = importedDomainMin
 	p.X.Max = importedDomainMax
 	p.Y.Min = importedRangeMin
 	p.Y.Max = importedRangeMax
+	p.Legend.ThumbnailWidth = 0.5 * vg.Inch
 
-	if err := p.Save(4*vg.Inch, 4*vg.Inch, filename); err != nil {
+	w := 8 * vg.Inch
+	h := 8 * vg.Inch
+
+	img := vgimg.New(w, h)
+	c := draw.New(img)
+	p.Draw(c)
+
+	f, err := os.Create(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	png := vgimg.PngCanvas{Canvas: img}
+	if _, err := png.WriteTo(f); err != nil {
 		panic(err)
 	}
 }
 
-func parseFunction(exprStr string) (*plotter.Function, error) {
-	if exprStr == "" {
-		fn := plotter.NewFunction(func(x float64) float64 {
-			return math.NaN()
-		})
-		fn.Samples = 1000
-		return fn, nil
+type Points []struct{ X, Y float64 }
+
+func (p Points) Len() int                    { return len(p) }
+func (p Points) XY(i int) (float64, float64) { return p[i].X, p[i].Y }
+
+func generatePoints(expr string, xmin, xmax float64) Points {
+	if expr == "" {
+		return nil
 	}
-	fn := plotter.NewFunction(func(x float64) float64 {
-		variables := map[string]*big.Rat{
-			"x": new(big.Rat).SetFloat64(x),
-			"pi": func() *big.Rat {
-				rat, _ := new(big.Float).SetFloat64(math.Pi).Rat(nil)
-				return rat
-			}(),
-			"e": func() *big.Rat {
-				rat, _ := new(big.Float).SetFloat64(math.E).Rat(nil)
-				return rat
-			}(),
+
+	points := make(Points, 0, 1000)
+	steps := 1000
+	dx := (xmax - xmin) / float64(steps)
+	lastY := math.NaN()
+
+	for i := 0; i <= steps; i++ {
+		x := xmin + float64(i)*dx
+		res, err := mathcat.Eval(strings.ReplaceAll(expr, "x", fmt.Sprintf("(%g)", x)))
+		if err != nil {
+			continue
+		}
+		y, ok := res.Float64()
+		if !ok || math.IsInf(y, 0) || math.IsNaN(y) {
+			continue
 		}
 
-		res, err := mathcat.Exec(exprStr, variables)
-		if err != nil || res == nil {
-			return math.NaN()
+		if !math.IsNaN(lastY) && math.Abs(y-lastY) > (xmax-xmin)/10 {
+			lastY = math.NaN()
+			continue
 		}
-		floatVal, ok := res.Float64()
-		if !ok {
-			return math.NaN()
+
+		points = append(points, struct{ X, Y float64 }{x, y})
+		lastY = y
+	}
+	return points
+}
+
+func parseFunction(exprStr string) (*plotter.Function, error) {
+	if exprStr == "" {
+		return plotter.NewFunction(func(x float64) float64 { return math.NaN() }), nil
+	}
+	pts := generatePoints(exprStr, -10, 10)
+	if len(pts) == 0 {
+		return nil, fmt.Errorf("invalid function")
+	}
+
+	fn := plotter.NewFunction(func(x float64) float64 {
+		for i := 0; i < len(pts)-1; i++ {
+			if x >= pts[i].X && x <= pts[i+1].X {
+				dx := pts[i+1].X - pts[i].X
+				dy := pts[i+1].Y - pts[i].Y
+				return pts[i].Y + (x-pts[i].X)*dy/dx
+			}
 		}
-		if math.IsInf(floatVal, 0) || math.IsNaN(floatVal) {
-			return math.NaN()
-		}
-		return floatVal
+		return math.NaN()
 	})
-	fn.Samples = 1000
 	return fn, nil
 }
 
@@ -500,21 +604,51 @@ func findInverse(fn *plotter.Function, y float64, Dmin, Dmax, tol float64) (floa
 }
 
 func findIntersection(fn1, fn2 *plotter.Function, Dmin, Dmax, tol float64) (float64, float64, bool) {
+	if fn1 == nil || fn2 == nil {
+		return math.NaN(), math.NaN(), false
+	}
+
+	diffFn := plotter.NewFunction(func(x float64) float64 {
+		return fn1.F(x) - fn2.F(x)
+	})
+
 	for i := 0; i < 100; i++ {
 		mid := (Dmin + Dmax) / 2
-		f1 := fn1.F(mid)
-		f2 := fn2.F(mid)
-		if math.IsNaN(f1) || math.IsNaN(f2) {
+		fmid := diffFn.F(mid)
+		if math.IsNaN(fmid) {
 			return math.NaN(), math.NaN(), false
 		}
-		if math.Abs(f1-f2) < tol {
-			return mid, f1, true
+		if math.Abs(fmid) < tol {
+			return mid, fn1.F(mid), true
 		}
-		if f1 < f2 {
+		if fmid < 0 {
 			Dmin = mid
 		} else {
 			Dmax = mid
 		}
 	}
 	return math.NaN(), math.NaN(), false
+
+}
+
+type SubTicker struct {
+	Major, Minor float64
+}
+
+func (t SubTicker) Ticks(min, max float64) []plot.Tick {
+	var ticks []plot.Tick
+
+	majorStart := math.Ceil(min/t.Major) * t.Major
+	for x := majorStart; x <= max; x += t.Major {
+		ticks = append(ticks, plot.Tick{Value: x, Label: fmt.Sprintf("%.0f", x)})
+	}
+
+	minorStart := math.Ceil(min/t.Minor) * t.Minor
+	for x := minorStart; x <= max; x += t.Minor {
+		if math.Mod(x, t.Major) != 0 {
+			ticks = append(ticks, plot.Tick{Value: x})
+		}
+	}
+
+	return ticks
 }
