@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"opencalcc/mathcat"
 	"os"
 	"strconv"
 	"strings"
-
-	"opencalcc/mathcat"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -391,7 +390,7 @@ func PressedEnter(expression fyne.CanvasObject, output fyne.CanvasObject, histor
 		output.(*widget.Entry).SetText("Error: " + err.Error())
 	} else {
 		var outputText string
-		if !calcmode { // float else exact
+		if !calcmode {
 			floatResult, _ := result.Float64()
 			outputText = fmt.Sprintf("%.6g", floatResult)
 		} else {
@@ -408,8 +407,8 @@ func makeGraph(filename string, function1 string, function2 string, function3 st
 
 	p.Title.Text = "Functions"
 	p.Title.TextStyle.Font.Size = vg.Points(24)
-	p.X.Label.Text = "X"
-	p.Y.Label.Text = "Y"
+	p.X.Label.Text = "Y"
+	p.Y.Label.Text = "X"
 	p.X.Label.TextStyle.Font.Size = vg.Points(20)
 	p.Y.Label.TextStyle.Font.Size = vg.Points(20)
 	p.X.Tick.Label.Font.Size = vg.Points(16)
@@ -439,6 +438,10 @@ func makeGraph(filename string, function1 string, function2 string, function3 st
 	majorInterval := 1.0
 	if math.Abs(importedDomainMax-importedDomainMin) >= 15 {
 		majorInterval = 5.0
+	} else if math.Abs(importedDomainMax-importedDomainMin) >= 50 {
+		majorInterval = 10.0
+	} else if math.Abs(importedDomainMax-importedDomainMin) >= 100 {
+		majorInterval = 20.0
 	}
 
 	p.X.Tick.Marker = SubTicker{Major: majorInterval, Minor: majorInterval / 4}
@@ -461,22 +464,19 @@ func makeGraph(filename string, function1 string, function2 string, function3 st
 	p.Add(fineGrid)
 	p.Add(mainGrid)
 
+	// Draw axes
 	if importedDomainMin <= 0 && importedDomainMax >= 0 {
-		yAxis := plotter.NewFunction(func(x float64) float64 { return x * 0 })
-		yAxis.Width = vg.Points(3)
+		yAxis := plotter.NewFunction(func(x float64) float64 { return 0 })
+		yAxis.Width = vg.Points(4)
 		yAxis.Color = color.RGBA{A: 255}
 		p.Add(yAxis)
 	}
 	if importedRangeMin <= 0 && importedRangeMax >= 0 {
 		xAxis := plotter.NewFunction(func(x float64) float64 { return 0 })
-		xAxis.Width = vg.Points(3)
+		xAxis.Width = vg.Points(4)
 		xAxis.Color = color.RGBA{A: 255}
 		p.Add(xAxis)
 	}
-
-	// probelems:
-	// no clear y axis
-	// when changing domain there are too many sublines
 
 	funcs := []string{function1, function2, function3, function4}
 	colors := []color.Color{
@@ -535,8 +535,8 @@ func generatePoints(expr string, xmin, xmax float64) Points {
 		return nil
 	}
 
-	points := make(Points, 0, 1000)
-	steps := 1000
+	points := make(Points, 0, 7000)
+	steps := 7000
 	dx := (xmax - xmin) / float64(steps)
 	lastY := math.NaN()
 
@@ -548,12 +548,17 @@ func generatePoints(expr string, xmin, xmax float64) Points {
 		}
 		y, ok := res.Float64()
 		if !ok || math.IsInf(y, 0) || math.IsNaN(y) {
+			lastY = math.NaN()
 			continue
 		}
 
-		if !math.IsNaN(lastY) && math.Abs(y-lastY) > (xmax-xmin)/10 {
-			lastY = math.NaN()
-			continue
+		if !math.IsNaN(lastY) {
+			delta := math.Abs(y - lastY)
+			threshold := math.Max(math.Abs(y), math.Abs(lastY)) * 0.5
+			if delta > threshold {
+				lastY = math.NaN()
+				continue
+			}
 		}
 
 		points = append(points, struct{ X, Y float64 }{x, y})
