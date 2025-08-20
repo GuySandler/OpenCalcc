@@ -535,10 +535,13 @@ func generatePoints(expr string, xmin, xmax float64) Points {
 		return nil
 	}
 
-	points := make(Points, 0, 7000)
+	initialCapacity := 1000
+	points := make(Points, 0, initialCapacity)
 	steps := 7000
 	dx := (xmax - xmin) / float64(steps)
 	lastY := math.NaN()
+
+	growthFactor := 1.5
 
 	for i := 0; i <= steps; i++ {
 		x := xmin + float64(i)*dx
@@ -559,6 +562,14 @@ func generatePoints(expr string, xmin, xmax float64) Points {
 				lastY = math.NaN()
 				continue
 			}
+		}
+
+		// dynamically change amount of points
+		if len(points) == cap(points) {
+			newCap := int(float64(cap(points)) * growthFactor)
+			newPoints := make(Points, len(points), newCap)
+			copy(newPoints, points)
+			points = newPoints
 		}
 
 		points = append(points, struct{ X, Y float64 }{x, y})
