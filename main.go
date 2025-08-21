@@ -6,6 +6,8 @@ import (
 	"math"
 	"opencalcc/mathcat"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -25,6 +27,10 @@ import (
 func main() {
 	app := app.New()
 	window := app.NewWindow("OpenCalcc")
+
+	debug.SetMemoryLimit(124 * 1024 * 1024)
+	debug.SetGCPercent(25)
+	runtime.GOMAXPROCS(1)
 
 	// graph
 	functionLabel := widget.NewRichTextFromMarkdown("## Function Input")
@@ -542,15 +548,21 @@ func generatePoints(expr string, xmin, xmax float64) Points {
 	lastY := math.NaN()
 
 	growthFactor := 1.5
+	maxValue := 1e6
 
 	for i := 0; i <= steps; i++ {
 		x := xmin + float64(i)*dx
 		res, err := mathcat.Eval(strings.ReplaceAll(expr, "x", fmt.Sprintf("(%g)", x)))
 		if err != nil {
+			lastY = math.NaN()
+			continue
+		}
+		if res == nil {
+			lastY = math.NaN()
 			continue
 		}
 		y, ok := res.Float64()
-		if !ok || math.IsInf(y, 0) || math.IsNaN(y) {
+		if !ok || math.IsInf(y, 0) || math.IsNaN(y) || math.Abs(y) > maxValue {
 			lastY = math.NaN()
 			continue
 		}
