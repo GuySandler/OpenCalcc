@@ -59,3 +59,7 @@ doing float mode trig gives wrong answer
 I decided to make the main file in main.go using fyne becuase it's a well made desktop app library.
 
 I tried to make my own math tool but I quickly found mathcat online so I forked it and added a few more features
+
+## iamges
+<img width="1458" height="1037" alt="Screenshot from 2025-08-20 18-44-33" src="https://github.com/user-attachments/assets/55abc4c0-f1be-47ac-afdd-9f2be7656611" />
+<img width="1458" height="1037" alt="Screenshot from 2025-08-20 18-42-59" src="https://github.com/user-attachments/assets/a1c9207b-e697-4280-bf73-d268765a8ae8" />
