@@ -1,5 +1,7 @@
 # OpenClacc
 
+If the program runs with more than 125mb of memory, close and reopen it (sometimes it starts with extra but this should not happen normally)
+
 ## custom fork of Mathcat:
 added csc, sec, and cot
 
